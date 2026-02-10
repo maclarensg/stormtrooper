@@ -63,8 +63,9 @@ func New(opts Options) *App {
 	keymap := DefaultKeyMap()
 	bridge := NewBridge()
 
-	// Wire the agent's output through the bridge.
+	// Wire the agent's output and permission handler through the bridge.
 	opts.Agent.SetOutput(bridge.Stdout(), bridge.Stderr())
+	opts.Agent.SetPermission(bridge.Permission())
 
 	// Derive sidebar options from project context and config.
 	projectDir := ""

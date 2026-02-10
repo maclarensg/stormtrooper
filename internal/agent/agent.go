@@ -57,10 +57,15 @@ func New(opts Options) *Agent {
 	return a
 }
 
-// SetOutput overrides stdout and stderr writers (for testing).
+// SetOutput overrides stdout and stderr writers (for testing or TUI mode).
 func (a *Agent) SetOutput(stdout, stderr io.Writer) {
 	a.stdout = stdout
 	a.stderr = stderr
+}
+
+// SetPermission overrides the permission handler (for TUI mode).
+func (a *Agent) SetPermission(h permission.Handler) {
+	a.permission = h
 }
 
 // Send processes a user message through the conversation loop.

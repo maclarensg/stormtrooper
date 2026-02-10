@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gavinyap/stormtrooper/internal/agent"
 	"github.com/gavinyap/stormtrooper/internal/config"
 	projectctx "github.com/gavinyap/stormtrooper/internal/context"
@@ -16,12 +17,14 @@ import (
 	"github.com/gavinyap/stormtrooper/internal/permission"
 	"github.com/gavinyap/stormtrooper/internal/repl"
 	"github.com/gavinyap/stormtrooper/internal/tool"
+	"github.com/gavinyap/stormtrooper/internal/tui"
 
 	gocontext "context"
 )
 
 func main() {
 	model := flag.String("model", "", "LLM model to use (overrides config)")
+	noTUI := flag.Bool("no-tui", false, "Use plain REPL instead of TUI")
 	flag.Parse()
 
 	// Load config.
@@ -76,23 +79,37 @@ func main() {
 		SystemPrompt: systemPrompt,
 	})
 
-	// Set up signal handling for graceful exit.
-	ctx, cancel := gocontext.WithCancel(gocontext.Background())
-	defer cancel()
+	if *noTUI {
+		// REPL mode — existing behavior unchanged.
+		ctx, cancel := gocontext.WithCancel(gocontext.Background())
+		defer cancel()
 
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		<-sigCh     // First signal: graceful shutdown
-		cancel()
-		<-sigCh     // Second signal: force exit
-		os.Exit(1)
-	}()
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+		go func() {
+			<-sigCh // First signal: graceful shutdown
+			cancel()
+			<-sigCh // Second signal: force exit
+			os.Exit(1)
+		}()
 
-	// Run the REPL.
-	r := repl.New(rootAgent)
-	if err := r.Run(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+		r := repl.New(rootAgent)
+		if err := r.Run(ctx); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+	} else {
+		// TUI mode — Bubble Tea handles signals via tea.KeyMsg.
+		app := tui.New(tui.Options{
+			Agent:      rootAgent,
+			Config:     cfg,
+			ProjectCtx: projCtx,
+			Version:    "0.2.0",
+		})
+		p := tea.NewProgram(app, tea.WithAltScreen())
+		if _, err := p.Run(); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
 	}
 }
