@@ -32,13 +32,13 @@ type Theme struct {
 
 // DefaultTheme returns a Theme with sensible defaults for light and dark terminals.
 func DefaultTheme() Theme {
-	cyan := lipgloss.AdaptiveColor{Light: "6", Dark: "6"}
-	purple := lipgloss.AdaptiveColor{Light: "63", Dark: "63"}
-	gray := lipgloss.AdaptiveColor{Light: "245", Dark: "245"}
-	amber := lipgloss.AdaptiveColor{Light: "214", Dark: "214"}
-	green := lipgloss.AdaptiveColor{Light: "2", Dark: "2"}
-	statusBg := lipgloss.AdaptiveColor{Light: "236", Dark: "236"}
-	statusFg := lipgloss.AdaptiveColor{Light: "252", Dark: "252"}
+	cyan := lipgloss.Color("6")
+	purple := lipgloss.Color("63")
+	gray := lipgloss.Color("245")
+	amber := lipgloss.Color("214")
+	green := lipgloss.Color("2")
+	statusBg := lipgloss.Color("236")
+	statusFg := lipgloss.Color("252")
 
 	border := lipgloss.RoundedBorder()
 
