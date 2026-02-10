@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-02-10
+
+### Fixed
+- Ctrl+C now exits the application cleanly instead of getting stuck in an error loop.
+- Double Ctrl+C force-exits immediately.
+
 ## [0.1.0] - 2026-02-10
 
 ### Added
