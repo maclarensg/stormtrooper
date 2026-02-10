@@ -1,5 +1,12 @@
 package tui
 
+// AgentEvent is the interface for all events sent from the agent bridge
+// to the Bubble Tea event loop. Each event type implements this with a
+// marker method.
+type AgentEvent interface {
+	agentEvent()
+}
+
 // TokenMsg carries a streamed text token from the assistant.
 type TokenMsg struct {
 	Content string
@@ -46,3 +53,13 @@ type SubAgentSpawnMsg struct {
 
 // SubAgentDoneMsg signals that a sub-agent has completed.
 type SubAgentDoneMsg struct{}
+
+// agentEvent marker implementations.
+func (TokenMsg) agentEvent()              {}
+func (ToolStartMsg) agentEvent()          {}
+func (ToolResultMsg) agentEvent()         {}
+func (PermissionRequestMsg) agentEvent()  {}
+func (PermissionResponseMsg) agentEvent() {}
+func (AgentDoneMsg) agentEvent()          {}
+func (SubAgentSpawnMsg) agentEvent()      {}
+func (SubAgentDoneMsg) agentEvent()       {}
