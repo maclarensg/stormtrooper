@@ -196,3 +196,18 @@ func TestChatModel_Resize(t *testing.T) {
 		t.Errorf("expected viewport height 40, got %d", m.viewport.Height)
 	}
 }
+
+func TestChatModel_AddSystemMessage(t *testing.T) {
+	m := newTestChatModel()
+	m.AddSystemMessage("Error: something went wrong")
+
+	if len(m.messages) != 1 {
+		t.Fatalf("expected 1 message, got %d", len(m.messages))
+	}
+	if m.messages[0].Role != RoleSystem {
+		t.Errorf("expected RoleSystem, got %d", m.messages[0].Role)
+	}
+	if m.messages[0].Content != "Error: something went wrong" {
+		t.Errorf("expected error content, got %q", m.messages[0].Content)
+	}
+}

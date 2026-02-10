@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"errors"
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -227,6 +229,35 @@ func TestApp_AgentDone(t *testing.T) {
 	}
 	if a.focus != FocusInput {
 		t.Fatalf("expected focus to return to FocusInput, got %d", a.focus)
+	}
+}
+
+func TestApp_AgentDoneWithError(t *testing.T) {
+	app := newTestApp()
+	app.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
+
+	app.agentBusy = true
+	app.input.SetDisabled(true)
+	app.sidebar.SetAgentBusy(true)
+
+	doneMsg := AgentDoneMsg{Error: errors.New("API key invalid")}
+	model, _ := app.Update(doneMsg)
+	a := model.(*App)
+
+	if a.agentBusy {
+		t.Fatal("expected agentBusy to be false after AgentDoneMsg with error")
+	}
+
+	// The chat should contain a system message with the error.
+	found := false
+	for _, msg := range a.chat.messages {
+		if msg.Role == RoleSystem && strings.Contains(msg.Content, "API key invalid") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("expected system error message in chat after AgentDoneMsg with error")
 	}
 }
 

@@ -69,6 +69,16 @@ func (m *ChatModel) AddUserMessage(content string) {
 	m.renderAll()
 }
 
+// AddSystemMessage appends a system message and re-renders the viewport.
+func (m *ChatModel) AddSystemMessage(content string) {
+	m.messages = append(m.messages, ChatMessage{
+		Role:    RoleSystem,
+		Content: content,
+		Time:    time.Now(),
+	})
+	m.renderAll()
+}
+
 // SetSize updates the viewport dimensions and recreates the glamour renderer
 // with the new width.
 func (m *ChatModel) SetSize(w, h int) {

@@ -2,6 +2,7 @@ package tui
 
 import (
 	gocontext "context"
+	"fmt"
 	"path/filepath"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -203,6 +204,10 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.input.SetDisabled(false)
 		a.sidebar.SetAgentBusy(false)
 		a.setFocus(FocusInput)
+
+		if msg.Error != nil {
+			a.chat.AddSystemMessage(fmt.Sprintf("Error: %v", msg.Error))
+		}
 
 		var chatCmd, sidebarCmd tea.Cmd
 		a.chat, chatCmd = a.chat.Update(msg)
