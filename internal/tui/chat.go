@@ -46,7 +46,7 @@ func NewChatModel(theme *Theme) ChatModel {
 	vp.SetContent("")
 
 	r, _ := glamour.NewTermRenderer(
-		glamour.WithAutoStyle(),
+		glamour.WithStylePath("dark"),
 		glamour.WithWordWrap(80),
 	)
 
@@ -78,7 +78,7 @@ func (m *ChatModel) SetSize(w, h int) {
 	m.viewport.Height = h
 	if w > 0 {
 		r, err := glamour.NewTermRenderer(
-			glamour.WithAutoStyle(),
+			glamour.WithStylePath("dark"),
 			glamour.WithWordWrap(w-4), // leave a small margin
 		)
 		if err == nil {

@@ -1,11 +1,18 @@
 package tui
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
+
+var ansiRe = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+
+func stripANSI(s string) string {
+	return ansiRe.ReplaceAllString(s, "")
+}
 
 func newTestChatModel() ChatModel {
 	theme := DefaultTheme()
@@ -43,7 +50,7 @@ func TestChatModel_StreamTokens(t *testing.T) {
 		_ = cmd
 	}
 
-	view := m.View()
+	view := stripANSI(m.View())
 	if !strings.Contains(view, "Hello from the assistant") {
 		t.Errorf("expected streamed content in view, got:\n%s", view)
 	}
