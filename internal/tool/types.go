@@ -24,6 +24,15 @@ type Tool interface {
 	Execute(ctx context.Context, params json.RawMessage) (string, error)
 }
 
+// Previewer is an optional interface that tools can implement to provide
+// human-readable previews for permission prompts. Tools that require
+// PermissionPrompt should implement this to show meaningful context
+// (e.g., the command for shell_exec, a diff for edit_file) instead of
+// raw JSON arguments.
+type Previewer interface {
+	Preview(params json.RawMessage) string
+}
+
 // ToolDef represents a tool definition in OpenAI function calling format.
 type ToolDef struct {
 	Type     string      `json:"type"`

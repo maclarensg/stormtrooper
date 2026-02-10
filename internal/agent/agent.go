@@ -78,6 +78,11 @@ func (a *Agent) Send(ctx context.Context, userMessage string) error {
 // loop runs the core agent loop: send to LLM, handle tool calls, repeat.
 func (a *Agent) loop(ctx context.Context) error {
 	for {
+		// Check for context cancellation before each iteration.
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("agent cancelled: %w", err)
+		}
+
 		// Build tool definitions from registry.
 		toolDefs := a.convertToolDefs()
 
@@ -133,7 +138,12 @@ func (a *Agent) executeTool(ctx context.Context, tc llm.ToolCall) string {
 
 	// Permission check.
 	if t.Permission() == tool.PermissionPrompt {
-		preview := fmt.Sprintf("%s(%s)", tc.Function.Name, truncateArgs(tc.Function.Arguments, 200))
+		var preview string
+		if p, ok := t.(tool.Previewer); ok {
+			preview = p.Preview(json.RawMessage(tc.Function.Arguments))
+		} else {
+			preview = fmt.Sprintf("%s(%s)", tc.Function.Name, truncateArgs(tc.Function.Arguments, 200))
+		}
 		if !a.permission.Check(tc.Function.Name, preview) {
 			fmt.Fprintf(a.stderr, "[tool] %s: permission denied\n", tc.Function.Name)
 			return "Permission denied by user"
