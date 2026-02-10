@@ -83,8 +83,10 @@ func main() {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
-		<-sigCh
+		<-sigCh     // First signal: graceful shutdown
 		cancel()
+		<-sigCh     // Second signal: force exit
+		os.Exit(1)
 	}()
 
 	// Run the REPL.

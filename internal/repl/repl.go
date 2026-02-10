@@ -43,6 +43,11 @@ func (r *REPL) Run(ctx context.Context) error {
 	fmt.Fprintln(r.out)
 
 	for {
+		// Check if context is cancelled (e.g., Ctrl+C).
+		if ctx.Err() != nil {
+			break
+		}
+
 		input, err := r.input.ReadInput()
 		if err == io.EOF {
 			break
@@ -61,6 +66,9 @@ func (r *REPL) Run(ctx context.Context) error {
 		}
 
 		if err := r.agent.Send(ctx, input); err != nil {
+			if ctx.Err() != nil {
+				break // Context cancelled (Ctrl+C), exit REPL
+			}
 			fmt.Fprintf(r.out, "Error: %v\n", err)
 			continue
 		}
