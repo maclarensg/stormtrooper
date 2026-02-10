@@ -113,6 +113,11 @@ func (t *SpawnAgentTool) Execute(ctx context.Context, params json.RawMessage) (s
 	ch := make(chan result, 1)
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				ch <- result{err: fmt.Errorf("sub-agent panic: %v", r)}
+			}
+		}()
 		err := child.Send(ctx, p.Task)
 		ch <- result{output: outputBuf.String(), err: err}
 	}()

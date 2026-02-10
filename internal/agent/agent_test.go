@@ -332,6 +332,41 @@ func TestAgent_SystemPromptInHistory(t *testing.T) {
 	ag.Send(context.Background(), "Hi")
 }
 
+func TestAgent_CancelledContextReturnsError(t *testing.T) {
+	// Create an already-cancelled context.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("LLM should not be called when context is already cancelled")
+	}))
+	defer server.Close()
+
+	client := llm.NewClient("test-key")
+	client.SetBaseURL(server.URL)
+
+	reg := tool.NewRegistry()
+	perm := permission.NewCheckerWithIO(strings.NewReader(""), &bytes.Buffer{})
+
+	ag := New(Options{
+		Client:     client,
+		Registry:   reg,
+		Permission: perm,
+		Model:      "test-model",
+	})
+
+	var stdout, stderr bytes.Buffer
+	ag.SetOutput(&stdout, &stderr)
+
+	err := ag.Send(ctx, "Hi")
+	if err == nil {
+		t.Fatal("expected error when context is cancelled")
+	}
+	if !strings.Contains(err.Error(), "cancelled") {
+		t.Errorf("expected 'cancelled' in error, got: %v", err)
+	}
+}
+
 func TestTruncateArgs(t *testing.T) {
 	short := "short"
 	if truncateArgs(short, 10) != "short" {
