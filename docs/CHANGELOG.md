@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-02-10
+
+### Fixed
+- Fixed crash when streaming AI responses (strings.Builder copy panic).
+- Fixed garbled `rgb:` text appearing on TUI launch from terminal color queries.
+
 ## [0.2.0] - 2026-02-10
 
 ### Added
