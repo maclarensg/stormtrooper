@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-02-10
+
+### Fixed
+- Fixed terminal color query text (`3030/0a0a/...`) leaking into the TUI on launch.
+- LLM errors (bad API key, network issues, wrong model) are now shown in the chat instead of being silently swallowed.
+
 ## [0.2.1] - 2026-02-10
 
 ### Fixed
