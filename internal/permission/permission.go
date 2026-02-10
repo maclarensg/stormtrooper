@@ -10,7 +10,14 @@ import (
 	"strings"
 )
 
+// Handler is the interface for permission checking.
+// The REPL uses Checker (reads stdin), the TUI uses its own implementation.
+type Handler interface {
+	Check(toolName string, preview string) bool
+}
+
 // Checker handles permission prompts for tool execution.
+// It implements the Handler interface.
 type Checker struct {
 	in  io.Reader
 	out io.Writer

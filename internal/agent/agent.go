@@ -19,7 +19,7 @@ import (
 type Agent struct {
 	client     *llm.Client
 	registry   *tool.Registry
-	permission *permission.Checker
+	permission permission.Handler
 	model      string
 	history    []llm.Message
 	stdout     io.Writer
@@ -30,7 +30,7 @@ type Agent struct {
 type Options struct {
 	Client       *llm.Client
 	Registry     *tool.Registry
-	Permission   *permission.Checker
+	Permission   permission.Handler
 	Model        string
 	SystemPrompt string
 }

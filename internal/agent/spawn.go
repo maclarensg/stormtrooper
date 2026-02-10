@@ -15,14 +15,14 @@ import (
 
 // SpawnAgentTool creates and runs a sub-agent with a focused task.
 type SpawnAgentTool struct {
-	Client  *llm.Client
+	Client   *llm.Client
 	Registry *tool.Registry
-	Perm    *permission.Checker
-	Model   string // parent's model as default
+	Perm     permission.Handler
+	Model    string // parent's model as default
 }
 
 // NewSpawnAgentTool creates a spawn_agent tool with the given shared resources.
-func NewSpawnAgentTool(client *llm.Client, registry *tool.Registry, perm *permission.Checker, defaultModel string) *SpawnAgentTool {
+func NewSpawnAgentTool(client *llm.Client, registry *tool.Registry, perm permission.Handler, defaultModel string) *SpawnAgentTool {
 	return &SpawnAgentTool{
 		Client:   client,
 		Registry: registry,
