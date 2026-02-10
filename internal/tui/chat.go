@@ -32,7 +32,7 @@ type ChatMessage struct {
 type ChatModel struct {
 	viewport   viewport.Model
 	messages   []ChatMessage
-	streaming  strings.Builder // accumulates current assistant response tokens
+	streaming  *strings.Builder // accumulates current assistant response tokens
 	theme      *Theme
 	width      int
 	height     int
@@ -53,6 +53,7 @@ func NewChatModel(theme *Theme) ChatModel {
 	return ChatModel{
 		viewport:   vp,
 		theme:      theme,
+		streaming:  &strings.Builder{},
 		autoScroll: true,
 		renderer:   r,
 	}
