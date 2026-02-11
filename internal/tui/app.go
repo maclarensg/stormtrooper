@@ -44,6 +44,9 @@ type App struct {
 	// Permission state
 	permReq *PermissionRequestMsg
 
+	// Sidebar visibility
+	sidebarVisible bool
+
 	// Theme and keymap
 	theme  Theme
 	keymap KeyMap
@@ -96,11 +99,12 @@ func New(opts Options) *App {
 			ModelName:    modelName,
 		}),
 		statusbar: NewStatusBarModel(&theme, opts.Version, modelName, cwd),
-		focus:     FocusInput,
-		bridge:    bridge,
-		agent:     opts.Agent,
-		theme:     theme,
-		keymap:    keymap,
+		focus:          FocusInput,
+		bridge:         bridge,
+		agent:          opts.Agent,
+		sidebarVisible: true,
+		theme:          theme,
+		keymap:         keymap,
 	}
 }
 
@@ -137,6 +141,11 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case key.Matches(msg, a.keymap.Tab):
 			a.toggleFocus()
+			return a, nil
+
+		case key.Matches(msg, a.keymap.ToggleSidebar):
+			a.sidebarVisible = !a.sidebarVisible
+			a.recalcLayout()
 			return a, nil
 
 		case key.Matches(msg, a.keymap.FocusChat):
@@ -238,8 +247,13 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (a *App) View() string {
 	statusBar := a.statusbar.View()
 	chatView := a.chat.View()
-	sidebarView := a.sidebar.View()
-	mainArea := lipgloss.JoinHorizontal(lipgloss.Top, chatView, sidebarView)
+	var mainArea string
+	if a.sidebarVisible {
+		sidebarView := a.sidebar.View()
+		mainArea = lipgloss.JoinHorizontal(lipgloss.Top, chatView, sidebarView)
+	} else {
+		mainArea = chatView
+	}
 	inputView := a.input.View()
 
 	return lipgloss.JoinVertical(lipgloss.Left, statusBar, mainArea, inputView)
@@ -300,8 +314,11 @@ func (a *App) recalcLayout() {
 	statusBarHeight := 1
 	// Input: 3 rows + 2 for borders.
 	inputHeight := 5
-	// Sidebar width is fixed.
-	sbWidth := sidebarWidth
+	// Sidebar width is fixed when visible, 0 when hidden.
+	sbWidth := 0
+	if a.sidebarVisible {
+		sbWidth = sidebarWidth
+	}
 
 	// Chat gets the remaining space.
 	chatWidth := a.width - sbWidth

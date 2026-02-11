@@ -13,7 +13,8 @@ type KeyMap struct {
 	Quit       key.Binding // Ctrl+C
 	PermAllow  key.Binding // y -- allow permission
 	PermDeny   key.Binding // n -- deny permission
-	Tab        key.Binding // Tab -- toggle focus
+	Tab           key.Binding // Tab -- toggle focus
+	ToggleSidebar key.Binding // Ctrl+B -- toggle sidebar
 }
 
 // DefaultKeyMap returns the default key bindings.
@@ -58,6 +59,10 @@ func DefaultKeyMap() KeyMap {
 		Tab: key.NewBinding(
 			key.WithKeys("tab"),
 			key.WithHelp("tab", "toggle focus"),
+		),
+		ToggleSidebar: key.NewBinding(
+			key.WithKeys("ctrl+b"),
+			key.WithHelp("ctrl+b", "toggle sidebar"),
 		),
 	}
 }
