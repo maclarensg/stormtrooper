@@ -71,6 +71,14 @@ func (w *ToolEventWriter) parseLine(line string) {
 	}
 
 	switch {
+	case strings.HasPrefix(line, "[tool:done] "):
+		name := strings.TrimPrefix(line, "[tool:done] ")
+		w.events <- ToolResultMsg{Name: name}
+
+	case strings.HasPrefix(line, "[tool:error] "):
+		name := strings.TrimPrefix(line, "[tool:error] ")
+		w.events <- ToolResultMsg{Name: name, Error: "error"}
+
 	case strings.HasPrefix(line, "[tool] "):
 		rest := strings.TrimPrefix(line, "[tool] ")
 		// Skip "permission denied" lines — handled by the permission flow.

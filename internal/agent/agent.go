@@ -159,9 +159,11 @@ func (a *Agent) executeTool(ctx context.Context, tc llm.ToolCall) string {
 
 	result, err := t.Execute(ctx, json.RawMessage(tc.Function.Arguments))
 	if err != nil {
+		fmt.Fprintf(a.stderr, "[tool:error] %s\n", tc.Function.Name)
 		return fmt.Sprintf("Tool error: %v", err)
 	}
 
+	fmt.Fprintf(a.stderr, "[tool:done] %s\n", tc.Function.Name)
 	return result
 }
 

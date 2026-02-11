@@ -80,11 +80,10 @@ func (m SidebarModel) Update(msg tea.Msg) (SidebarModel, tea.Cmd) {
 		return m, nil
 
 	case ToolResultMsg:
-		// Find the most recent running entry with this name.
+		// Remove the completed tool entry from the list.
 		for i := range m.toolCalls {
 			if m.toolCalls[i].Name == msg.Name && m.toolCalls[i].Running {
-				m.toolCalls[i].Running = false
-				m.toolCalls[i].Error = msg.Error != ""
+				m.toolCalls = append(m.toolCalls[:i], m.toolCalls[i+1:]...)
 				break
 			}
 		}

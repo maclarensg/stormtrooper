@@ -37,14 +37,13 @@ func TestSidebar_ToolComplete(t *testing.T) {
 	m, _ = m.Update(ToolStartMsg{ID: "1", Name: "read_file", Args: "src/main.go"})
 	m, _ = m.Update(ToolResultMsg{ID: "1", Name: "read_file", Result: "ok"})
 
-	if len(m.toolCalls) != 1 {
-		t.Fatalf("expected 1 tool call, got %d", len(m.toolCalls))
+	if len(m.toolCalls) != 0 {
+		t.Fatalf("expected completed tool to be removed, got %d entries", len(m.toolCalls))
 	}
-	if m.toolCalls[0].Running {
-		t.Error("expected tool to not be running after completion")
-	}
-	if m.toolCalls[0].Error {
-		t.Error("expected no error on successful completion")
+
+	view := m.View()
+	if strings.Contains(view, "read_file") {
+		t.Error("expected completed tool to not appear in sidebar view")
 	}
 }
 
@@ -54,13 +53,8 @@ func TestSidebar_ToolError(t *testing.T) {
 	m, _ = m.Update(ToolStartMsg{ID: "1", Name: "shell_exec", Args: "ls"})
 	m, _ = m.Update(ToolResultMsg{ID: "1", Name: "shell_exec", Error: "exit 1"})
 
-	if !m.toolCalls[0].Error {
-		t.Error("expected error flag on failed tool")
-	}
-
-	view := m.View()
-	if !strings.Contains(view, "\u2717") {
-		t.Error("expected cross mark in view for errored tool")
+	if len(m.toolCalls) != 0 {
+		t.Fatalf("expected errored tool to be removed, got %d entries", len(m.toolCalls))
 	}
 }
 
