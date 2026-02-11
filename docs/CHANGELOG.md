@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-02-10
+
+### Fixed
+- Fully eliminated terminal color query leaks by setting a static lipgloss color profile on startup.
+- Fixed REPL mode displaying wrong version (v0.1.0 instead of current version).
+
+### Added
+- Integration tests using teatest that exercise the full TUI event loop (no more rubber-stamp QA).
+
 ## [0.2.2] - 2026-02-10
 
 ### Fixed

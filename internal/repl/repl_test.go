@@ -54,7 +54,7 @@ func TestRun_ExitCommand(t *testing.T) {
 	in := strings.NewReader("/exit\n")
 	out := &bytes.Buffer{}
 	inputReader := NewInputReaderWithIO(in, out)
-	r := NewWithIO(ag, inputReader, out)
+	r := NewWithIO(ag, "0.2.2", inputReader, out)
 
 	err := r.Run(context.Background())
 	if err != nil {
@@ -75,7 +75,7 @@ func TestRun_EOF(t *testing.T) {
 	in := strings.NewReader("") // immediate EOF
 	out := &bytes.Buffer{}
 	inputReader := NewInputReaderWithIO(in, out)
-	r := NewWithIO(ag, inputReader, out)
+	r := NewWithIO(ag, "0.2.2", inputReader, out)
 
 	err := r.Run(context.Background())
 	if err != nil {
@@ -100,7 +100,7 @@ func TestRun_CancelledContextExitsCleanly(t *testing.T) {
 	in := strings.NewReader("hello\nhello\nhello\n")
 	out := &bytes.Buffer{}
 	inputReader := NewInputReaderWithIO(in, out)
-	r := NewWithIO(ag, inputReader, out)
+	r := NewWithIO(ag, "0.2.2", inputReader, out)
 
 	err := r.Run(ctx)
 	if err != nil {
@@ -129,7 +129,7 @@ func TestRun_ContextCancelledDuringSendExitsCleanly(t *testing.T) {
 	in := strings.NewReader("hello\nmore input\n")
 	out := &bytes.Buffer{}
 	inputReader := NewInputReaderWithIO(in, out)
-	r := NewWithIO(ag, inputReader, out)
+	r := NewWithIO(ag, "0.2.2", inputReader, out)
 
 	err := r.Run(ctx)
 	if err != nil {
@@ -156,7 +156,7 @@ func TestRun_NormalSendThenExit(t *testing.T) {
 	in := strings.NewReader("hi\n/exit\n")
 	out := &bytes.Buffer{}
 	inputReader := NewInputReaderWithIO(in, out)
-	r := NewWithIO(ag, inputReader, out)
+	r := NewWithIO(ag, "0.2.2", inputReader, out)
 
 	err := r.Run(context.Background())
 	if err != nil {

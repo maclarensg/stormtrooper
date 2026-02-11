@@ -13,32 +13,35 @@ import (
 
 // REPL manages the read-eval-print loop.
 type REPL struct {
-	agent *agent.Agent
-	input *InputReader
-	out   io.Writer
+	agent   *agent.Agent
+	input   *InputReader
+	out     io.Writer
+	version string
 }
 
-// New creates a new REPL with the given agent.
-func New(ag *agent.Agent) *REPL {
+// New creates a new REPL with the given agent and version string.
+func New(ag *agent.Agent, version string) *REPL {
 	return &REPL{
-		agent: ag,
-		input: NewInputReader(),
-		out:   os.Stderr,
+		agent:   ag,
+		input:   NewInputReader(),
+		out:     os.Stderr,
+		version: version,
 	}
 }
 
 // NewWithIO creates a REPL with custom I/O for testing.
-func NewWithIO(ag *agent.Agent, input *InputReader, out io.Writer) *REPL {
+func NewWithIO(ag *agent.Agent, version string, input *InputReader, out io.Writer) *REPL {
 	return &REPL{
-		agent: ag,
-		input: input,
-		out:   out,
+		agent:   ag,
+		input:   input,
+		out:     out,
+		version: version,
 	}
 }
 
 // Run starts the REPL loop. Blocks until the user exits or input is closed.
 func (r *REPL) Run(ctx context.Context) error {
-	fmt.Fprintln(r.out, "Stormtrooper v0.1.0 — AI coding assistant")
+	fmt.Fprintf(r.out, "Stormtrooper v%s — AI coding assistant\n", r.version)
 	fmt.Fprintln(r.out, "Type /exit or Ctrl+C to quit.")
 	fmt.Fprintln(r.out)
 

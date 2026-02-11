@@ -100,7 +100,7 @@ func main() {
 			os.Exit(1)
 		}()
 
-		r := repl.New(rootAgent)
+		r := repl.New(rootAgent, "0.2.3")
 		if err := r.Run(ctx); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
@@ -111,7 +111,7 @@ func main() {
 			Agent:      rootAgent,
 			Config:     cfg,
 			ProjectCtx: projCtx,
-			Version:    "0.2.2",
+			Version:    "0.2.3",
 		})
 		p := tea.NewProgram(app, tea.WithAltScreen())
 		if _, err := p.Run(); err != nil {
