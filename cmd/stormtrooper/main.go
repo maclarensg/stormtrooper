@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/gavinyap/stormtrooper/internal/agent"
 	"github.com/gavinyap/stormtrooper/internal/config"
 	projectctx "github.com/gavinyap/stormtrooper/internal/context"
@@ -18,11 +19,17 @@ import (
 	"github.com/gavinyap/stormtrooper/internal/repl"
 	"github.com/gavinyap/stormtrooper/internal/tool"
 	"github.com/gavinyap/stormtrooper/internal/tui"
+	"github.com/muesli/termenv"
 
 	gocontext "context"
 )
 
 func main() {
+	// Force a static color profile to prevent lipgloss/termenv from querying
+	// the terminal via escape sequences, which leaks garbled text in the TUI.
+	lipgloss.SetColorProfile(termenv.ANSI256)
+	lipgloss.SetHasDarkBackground(true)
+
 	model := flag.String("model", "", "LLM model to use (overrides config)")
 	noTUI := flag.Bool("no-tui", false, "Use plain REPL instead of TUI")
 	flag.Parse()
@@ -104,7 +111,7 @@ func main() {
 			Agent:      rootAgent,
 			Config:     cfg,
 			ProjectCtx: projCtx,
-			Version:    "0.2.0",
+			Version:    "0.2.2",
 		})
 		p := tea.NewProgram(app, tea.WithAltScreen())
 		if _, err := p.Run(); err != nil {
