@@ -367,6 +367,140 @@ func TestAgent_CancelledContextReturnsError(t *testing.T) {
 	}
 }
 
+// sseToolCallWithContentResponse simulates an open-source model that sends
+// tool call arguments as both Delta.Content and Delta.ToolCalls simultaneously.
+func sseToolCallWithContentResponse(callID, toolName, args, leakedContent string) string {
+	var b strings.Builder
+	// Chunk that has both content and tool calls.
+	b.WriteString(fmt.Sprintf(
+		"data: {\"id\":\"1\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":%s,\"tool_calls\":[{\"index\":0,\"id\":%s,\"type\":\"function\",\"function\":{\"name\":%s,\"arguments\":%s}}]},\"finish_reason\":null}]}\n\n",
+		jsonStr(leakedContent), jsonStr(callID), jsonStr(toolName), jsonStr(args)))
+	b.WriteString("data: {\"id\":\"1\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"tool_calls\"}]}\n\n")
+	b.WriteString("data: [DONE]\n")
+	return b.String()
+}
+
+// sseContentWithSpecialTokens simulates a model emitting special tokens in content.
+func sseContentWithSpecialTokens(content string) string {
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("data: {\"id\":\"1\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"\"},\"finish_reason\":null}]}\n\n"))
+	b.WriteString(fmt.Sprintf("data: {\"id\":\"1\",\"choices\":[{\"index\":0,\"delta\":{\"content\":%s},\"finish_reason\":null}]}\n\n", jsonStr(content)))
+	b.WriteString("data: {\"id\":\"1\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n")
+	b.WriteString("data: [DONE]\n")
+	return b.String()
+}
+
+func TestAgent_StreamingFiltersToolCallContent(t *testing.T) {
+	callCount := 0
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount++
+		w.Header().Set("Content-Type", "text/event-stream")
+
+		if callCount == 1 {
+			// Model sends tool call args as content AND in tool_calls.
+			w.Write([]byte(sseToolCallWithContentResponse(
+				"call_1", "read_file", `{"path":"main.go"}`, `{"path":"main.go"}`)))
+		} else {
+			w.Write([]byte(sseTextResponse("Here is the file.")))
+		}
+	}))
+	defer server.Close()
+
+	client := llm.NewClient("test-key")
+	client.SetBaseURL(server.URL)
+
+	reg := tool.NewRegistry()
+	mt := &mockTool{name: "read_file", perm: tool.PermissionAuto, result: "file contents"}
+	reg.Register(mt)
+
+	perm := permission.NewCheckerWithIO(strings.NewReader(""), &bytes.Buffer{})
+
+	ag := New(Options{
+		Client:     client,
+		Registry:   reg,
+		Permission: perm,
+		Model:      "test-model",
+	})
+
+	var stdout, stderr bytes.Buffer
+	ag.SetOutput(&stdout, &stderr)
+
+	err := ag.Send(context.Background(), "Read main.go")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// The leaked JSON content should NOT appear in stdout.
+	if strings.Contains(stdout.String(), `"path"`) {
+		t.Errorf("expected tool call JSON to be filtered from stdout, got %q", stdout.String())
+	}
+	// The real text response should still appear.
+	if !strings.Contains(stdout.String(), "Here is the file.") {
+		t.Errorf("expected real text response in stdout, got %q", stdout.String())
+	}
+}
+
+func TestAgent_StreamingStripsSpecialTokens(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Write([]byte(sseContentWithSpecialTokens("Hello<|im_end|>")))
+	}))
+	defer server.Close()
+
+	client := llm.NewClient("test-key")
+	client.SetBaseURL(server.URL)
+
+	reg := tool.NewRegistry()
+	perm := permission.NewCheckerWithIO(strings.NewReader(""), &bytes.Buffer{})
+
+	ag := New(Options{
+		Client:     client,
+		Registry:   reg,
+		Permission: perm,
+		Model:      "test-model",
+	})
+
+	var stdout bytes.Buffer
+	ag.SetOutput(&stdout, &bytes.Buffer{})
+
+	err := ag.Send(context.Background(), "Hi")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if strings.Contains(stdout.String(), "<|im_end|>") {
+		t.Errorf("expected special tokens to be stripped, got %q", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "Hello") {
+		t.Errorf("expected 'Hello' in output, got %q", stdout.String())
+	}
+}
+
+func TestStripSpecialTokens(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"no tokens", "Hello world", "Hello world"},
+		{"tool_call_end", "text<|tool_call_end|>", "text"},
+		{"tool_call_start", "<|tool_call_start|>text", "text"},
+		{"im_end", "Hello<|im_end|>", "Hello"},
+		{"multiple tokens", "<|tool_call_start|>fn<|tool_sep|>args<|tool_call_end|>", "fnargs"},
+		{"empty string", "", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := stripSpecialTokens(tt.input)
+			if got != tt.expected {
+				t.Errorf("stripSpecialTokens(%q) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
+
 func TestTruncateArgs(t *testing.T) {
 	short := "short"
 	if truncateArgs(short, 10) != "short" {

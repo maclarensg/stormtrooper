@@ -173,6 +173,130 @@ func TestDeltaAccumulator_SingleToolCall(t *testing.T) {
 	}
 }
 
+func TestDeltaAccumulator_ToolCallWithLeakedContent(t *testing.T) {
+	acc := NewDeltaAccumulator()
+
+	// Simulate an open-source model leaking tool call args as content.
+	acc.Add(ChatCompletionChunk{
+		Choices: []ChunkChoice{{
+			Index: 0,
+			Delta: MessageDelta{
+				Role:    "assistant",
+				Content: `<|tool_call_start|><|function|>read_file`,
+			},
+		}},
+	})
+	acc.Add(ChatCompletionChunk{
+		Choices: []ChunkChoice{{
+			Index: 0,
+			Delta: MessageDelta{
+				Content: `{"path":"main.go"}`,
+				ToolCalls: []ToolCallDelta{{
+					Index: 0,
+					ID:    "call_1",
+					Type:  "function",
+					Function: FunctionCall{
+						Name:      "read_file",
+						Arguments: `{"path":"main.go"}`,
+					},
+				}},
+			},
+		}},
+	})
+	acc.Add(ChatCompletionChunk{
+		Choices: []ChunkChoice{{
+			Index: 0,
+			Delta: MessageDelta{
+				Content: `<|tool_call_end|>`,
+			},
+		}},
+	})
+
+	msg := acc.Message()
+	if len(msg.ToolCalls) != 1 {
+		t.Fatalf("expected 1 tool call, got %d", len(msg.ToolCalls))
+	}
+	// Content should be cleaned — special tokens and JSON removed.
+	if strings.Contains(msg.Content, "<|tool_call") {
+		t.Errorf("expected special tokens to be stripped from content, got %q", msg.Content)
+	}
+	if strings.Contains(msg.Content, "read_file") {
+		t.Errorf("expected tool-call-like content to be removed, got %q", msg.Content)
+	}
+}
+
+func TestDeltaAccumulator_ToolCallContentIsJustJSON(t *testing.T) {
+	acc := NewDeltaAccumulator()
+
+	// Model sends the tool call arguments as content (JSON blob).
+	acc.Add(ChatCompletionChunk{
+		Choices: []ChunkChoice{{
+			Index: 0,
+			Delta: MessageDelta{
+				Role:    "assistant",
+				Content: `{"path":"src/main.go","content":"hello world"}`,
+				ToolCalls: []ToolCallDelta{{
+					Index: 0,
+					ID:    "call_1",
+					Type:  "function",
+					Function: FunctionCall{
+						Name:      "write_file",
+						Arguments: `{"path":"src/main.go","content":"hello world"}`,
+					},
+				}},
+			},
+		}},
+	})
+
+	msg := acc.Message()
+	if msg.Content != "" {
+		t.Errorf("expected empty content when tool calls present and content is JSON, got %q", msg.Content)
+	}
+}
+
+func TestCleanToolCallContent(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "special tokens stripped",
+			input:    "<|tool_call_start|><|function|>read_file<|tool_call_end|>",
+			expected: "read_file",
+		},
+		{
+			name:     "json blob removed",
+			input:    `{"path":"main.go","content":"data"}`,
+			expected: "",
+		},
+		{
+			name:     "mixed special tokens and json",
+			input:    `<|tool_call_start|>{"path":"main.go"}<|tool_call_end|>`,
+			expected: "",
+		},
+		{
+			name:     "empty after stripping",
+			input:    "<|tool_call_end|><|im_end|>",
+			expected: "",
+		},
+		{
+			name:     "real text preserved",
+			input:    "Here is the file content you requested.",
+			expected: "Here is the file content you requested.",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := cleanToolCallContent(tt.input)
+			if got != tt.expected {
+				t.Errorf("cleanToolCallContent(%q) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
+
 func TestDeltaAccumulator_MultipleToolCalls(t *testing.T) {
 	acc := NewDeltaAccumulator()
 

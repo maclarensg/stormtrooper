@@ -8,11 +8,22 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/gavinyap/stormtrooper/internal/llm"
 	"github.com/gavinyap/stormtrooper/internal/permission"
 	"github.com/gavinyap/stormtrooper/internal/tool"
 )
+
+// specialTokens are model-specific tokens that open-source models (via
+// OpenRouter) sometimes emit as regular content. They must be stripped.
+var specialTokens = []string{
+	"<|tool_call_end|>",
+	"<|tool_call_start|>",
+	"<|function|>",
+	"<|tool_sep|>",
+	"<|im_end|>",
+}
 
 // Agent orchestrates a conversation with an LLM, dispatching tool calls
 // and maintaining history.
@@ -97,11 +108,25 @@ func (a *Agent) loop(ctx context.Context) error {
 			Tools:    toolDefs,
 		}
 
-		// Stream the response.
+		// Stream the response, filtering out tool-call content and special tokens.
 		msg, err := a.client.ChatCompletionStream(ctx, req, func(chunk llm.ChatCompletionChunk) {
 			for _, choice := range chunk.Choices {
-				if choice.Delta.Content != "" {
-					fmt.Fprint(a.stdout, choice.Delta.Content)
+				// Skip content when the chunk also carries tool call deltas —
+				// some open-source models send tool call arguments as content.
+				if len(choice.Delta.ToolCalls) > 0 {
+					continue
+				}
+
+				content := choice.Delta.Content
+				if content == "" {
+					continue
+				}
+
+				// Strip special tokens that open-source models emit.
+				content = stripSpecialTokens(content)
+
+				if content != "" {
+					fmt.Fprint(a.stdout, content)
 				}
 			}
 		})
@@ -190,4 +215,12 @@ func truncateArgs(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen] + "..."
+}
+
+// stripSpecialTokens removes known model-specific special tokens from content.
+func stripSpecialTokens(s string) string {
+	for _, tok := range specialTokens {
+		s = strings.ReplaceAll(s, tok, "")
+	}
+	return s
 }
