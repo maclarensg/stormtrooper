@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-02-10
+
+### Fixed
+- Chat panel now scrolls properly — viewport accounts for border dimensions.
+- AI responses no longer show raw tool call JSON, literal `\n` characters, or special model tokens (`<|tool_call_end|>` etc.).
+- Completed tools are cleared from the sidebar activity panel.
+
+### Added
+- Press `Ctrl+B` to toggle the sidebar on/off (chat expands to full width when hidden).
+
 ## [0.2.3] - 2026-02-10
 
 ### Fixed
