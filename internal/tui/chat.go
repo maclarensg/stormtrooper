@@ -8,7 +8,6 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
-	"github.com/charmbracelet/lipgloss"
 )
 
 // MessageRole identifies who authored a chat message.
@@ -80,16 +79,29 @@ func (m *ChatModel) AddSystemMessage(content string) {
 }
 
 // SetSize updates the viewport dimensions and recreates the glamour renderer
-// with the new width.
+// with the new width. The viewport dimensions are reduced to account for the
+// border that wraps the chat panel (2 rows for top+bottom, 2 cols for
+// left+right).
 func (m *ChatModel) SetSize(w, h int) {
 	m.width = w
 	m.height = h
-	m.viewport.Width = w
-	m.viewport.Height = h
-	if w > 0 {
+
+	// The viewport sits inside a border, so subtract border space.
+	innerW := w - 2
+	innerH := h - 2
+	if innerW < 1 {
+		innerW = 1
+	}
+	if innerH < 1 {
+		innerH = 1
+	}
+	m.viewport.Width = innerW
+	m.viewport.Height = innerH
+
+	if innerW > 0 {
 		r, err := glamour.NewTermRenderer(
 			glamour.WithStylePath("dark"),
-			glamour.WithWordWrap(w-4), // leave a small margin
+			glamour.WithWordWrap(innerW-4), // leave a small margin
 		)
 		if err == nil {
 			m.renderer = r
@@ -213,9 +225,12 @@ func (m ChatModel) Update(msg tea.Msg) (ChatModel, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-// View returns the rendered viewport.
+// View returns the rendered viewport wrapped in a border.
 func (m ChatModel) View() string {
-	return m.viewport.View()
+	return m.theme.ChatBorder.
+		Width(m.width).
+		Height(m.height).
+		Render(m.viewport.View())
 }
 
 // renderAll rebuilds the entire viewport content from messages and the
@@ -280,9 +295,3 @@ func (m *ChatModel) renderMarkdown(text string) string {
 	return strings.TrimRight(rendered, "\n")
 }
 
-// borderStyle returns a styled border for the chat panel.
-func (m ChatModel) borderStyle() lipgloss.Style {
-	return m.theme.ChatBorder.
-		Width(m.width).
-		Height(m.height)
-}

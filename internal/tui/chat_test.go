@@ -189,11 +189,12 @@ func TestChatModel_Resize(t *testing.T) {
 	if m.height != 40 {
 		t.Errorf("expected height 40, got %d", m.height)
 	}
-	if m.viewport.Width != 120 {
-		t.Errorf("expected viewport width 120, got %d", m.viewport.Width)
+	// Viewport dimensions should be reduced by 2 for the border (top+bottom, left+right).
+	if m.viewport.Width != 118 {
+		t.Errorf("expected viewport width 118 (120-2 for border), got %d", m.viewport.Width)
 	}
-	if m.viewport.Height != 40 {
-		t.Errorf("expected viewport height 40, got %d", m.viewport.Height)
+	if m.viewport.Height != 38 {
+		t.Errorf("expected viewport height 38 (40-2 for border), got %d", m.viewport.Height)
 	}
 }
 
@@ -209,5 +210,52 @@ func TestChatModel_AddSystemMessage(t *testing.T) {
 	}
 	if m.messages[0].Content != "Error: something went wrong" {
 		t.Errorf("expected error content, got %q", m.messages[0].Content)
+	}
+}
+
+func TestChatModel_ViewportScrollable(t *testing.T) {
+	theme := DefaultTheme()
+	m := NewChatModel(&theme)
+	// Small viewport: inner height = 8-2 = 6 rows.
+	m.SetSize(60, 8)
+
+	// Add enough messages to exceed the viewport height.
+	for i := 0; i < 20; i++ {
+		m.AddUserMessage("Message line that should be long enough")
+	}
+
+	// Viewport content should exceed its visible height, enabling scrolling.
+	totalLines := m.viewport.TotalLineCount()
+	visibleLines := m.viewport.VisibleLineCount()
+	if totalLines <= visibleLines {
+		t.Errorf("expected content (%d lines) to exceed viewport (%d lines) for scrolling",
+			totalLines, visibleLines)
+	}
+
+	// Go to bottom first, then scroll up and verify offset changes.
+	m.viewport.GotoBottom()
+	prevOffset := m.viewport.YOffset
+	if prevOffset == 0 {
+		t.Fatal("expected non-zero YOffset after GotoBottom with content exceeding viewport")
+	}
+
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	if m.viewport.YOffset >= prevOffset {
+		t.Errorf("expected scrolling up to decrease YOffset, was %d now %d",
+			prevOffset, m.viewport.YOffset)
+	}
+}
+
+func TestChatModel_ViewBorderWrapped(t *testing.T) {
+	theme := DefaultTheme()
+	m := NewChatModel(&theme)
+	m.SetSize(40, 10)
+	m.AddUserMessage("test message")
+
+	view := m.View()
+	// The view should contain border characters from lipgloss RoundedBorder.
+	// RoundedBorder uses curved corners like "╭" and "╮".
+	if !strings.Contains(view, "╭") && !strings.Contains(view, "┌") {
+		t.Error("expected chat view to be wrapped in a border")
 	}
 }
