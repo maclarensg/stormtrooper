@@ -176,7 +176,6 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.sidebar.SetAgentBusy(true)
 		return a, tea.Batch(
 			a.runAgent(msg.Text),
-			WaitForEvent(a.bridge.Events()),
 			a.input.Init(), // restart spinner
 			a.sidebar.Init(),
 		)

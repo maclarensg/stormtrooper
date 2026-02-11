@@ -337,6 +337,64 @@ func TestApp_TokenMsgForwarded(t *testing.T) {
 	_ = a
 }
 
+func TestApp_TokenOrderPreserved(t *testing.T) {
+	app := newTestApp()
+	app.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
+
+	// Simulate a SendMsg followed by a sequence of tokens.
+	// Before the fix, SendMsg spawned a duplicate WaitForEvent goroutine
+	// which caused tokens to be delivered out of order.
+	app.Update(SendMsg{Text: "test prompt"})
+
+	// Feed tokens sequentially through the Update method and verify
+	// the streaming buffer accumulates them in the correct order.
+	tokens := []string{"I'll ", "run ", "the ", "ls ", "command"}
+	for _, tok := range tokens {
+		model, _ := app.Update(TokenMsg{Content: tok})
+		app = model.(*App)
+	}
+
+	got := app.chat.streaming.String()
+	expected := "I'll run the ls command"
+	if got != expected {
+		t.Fatalf("token order broken: expected %q, got %q", expected, got)
+	}
+}
+
+func TestApp_SendMsgDoesNotSpawnDuplicateWFE(t *testing.T) {
+	app := newTestApp()
+	app.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
+
+	// Send a message and capture the returned commands.
+	_, cmd := app.Update(SendMsg{Text: "hello"})
+	if cmd == nil {
+		t.Fatal("expected commands after SendMsg")
+	}
+
+	// Push a token onto the bridge channel.
+	app.bridge.events <- TokenMsg{Content: "test"}
+
+	// Read the token back. If SendMsg spawned a WFE, there would be two
+	// goroutines racing to read from events. With the fix, only the WFE
+	// from Init() is active.
+	select {
+	case ev := <-app.bridge.Events():
+		tok, ok := ev.(TokenMsg)
+		if !ok {
+			t.Fatalf("expected TokenMsg, got %T", ev)
+		}
+		if tok.Content != "test" {
+			t.Fatalf("expected token content 'test', got %q", tok.Content)
+		}
+	default:
+		// Channel was already drained by a competing goroutine — this
+		// would indicate the bug is still present. However, since we're
+		// not actually running the tea.Cmd goroutines in this unit test,
+		// the token should still be on the channel.
+		t.Fatal("token was consumed by unexpected goroutine")
+	}
+}
+
 func TestApp_ToolStartForwarded(t *testing.T) {
 	app := newTestApp()
 

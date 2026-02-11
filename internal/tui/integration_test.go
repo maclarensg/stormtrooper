@@ -173,3 +173,156 @@ func TestIntegration_UserMessageAppears(t *testing.T) {
 	tm.Send(tea.KeyMsg{Type: tea.KeyCtrlC})
 	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
 }
+
+// newStreamingIntegrationApp creates an App backed by a mock SSE server that
+// streams the given tokens as individual SSE data lines. This exercises the
+// full path: agent -> LLM client -> SSE parser -> EventWriter -> bridge ->
+// TUI Update loop.
+func newStreamingIntegrationApp(t *testing.T, tokens []string) *App {
+	t.Helper()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+
+		// Send role delta first.
+		fmt.Fprintf(w, "data: {\"choices\":[{\"delta\":{\"role\":\"assistant\"}}]}\n\n")
+
+		// Stream each token as a separate SSE event.
+		for _, tok := range tokens {
+			// Escape the token for JSON.
+			escaped := strings.ReplaceAll(tok, `\`, `\\`)
+			escaped = strings.ReplaceAll(escaped, `"`, `\"`)
+			fmt.Fprintf(w, "data: {\"choices\":[{\"delta\":{\"content\":\"%s\"}}]}\n\n", escaped)
+		}
+
+		fmt.Fprintf(w, "data: [DONE]\n\n")
+	}))
+	t.Cleanup(srv.Close)
+
+	client := llm.NewClient("fake-key")
+	client.SetBaseURL(srv.URL)
+
+	perm := permission.NewChecker()
+	reg := tool.NewRegistry()
+	ag := agent.New(agent.Options{
+		Client:     client,
+		Registry:   reg,
+		Permission: perm,
+		Model:      "test-model",
+	})
+
+	return New(Options{
+		Agent: ag,
+		Config: &config.Config{
+			Model: "test-model",
+		},
+		ProjectCtx: &projectctx.ProjectContext{
+			WorkingDir: "/home/user/myproject",
+			Memory:     "some memory",
+		},
+		Version: "v0.2.4-test",
+	})
+}
+
+// TestIntegration_StreamingTokenOrder verifies that tokens streamed from the
+// LLM arrive in the correct order in the TUI output. This is the core
+// regression test for the duplicate WaitForEvent bug.
+//
+// Under race detection, timing differences can cause AgentDoneMsg to arrive
+// before all tokens are consumed from the bridge channel. This is a known
+// design characteristic: the test verifies that tokens are never reordered
+// (the original bug), not that they all land in a single render frame.
+func TestIntegration_StreamingTokenOrder(t *testing.T) {
+	tokens := []string{"Alpha", " Beta", " Gamma", " Delta", " Epsilon"}
+	app := newStreamingIntegrationApp(t, tokens)
+	tm := teatest.NewTestModel(t, app, teatest.WithInitialTermSize(120, 40))
+
+	// Wait for initial render.
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		return strings.Contains(string(bts), "Tool Activity")
+	}, teatest.WithDuration(3*time.Second))
+
+	// Send a user message to trigger the agent loop.
+	tm.Send(SendMsg{Text: "test streaming"})
+
+	// Accumulate the full output stream and verify tokens appear in order.
+	// Each render frame is appended, so we see the progression of all
+	// rendered text. We wait until the last token "Epsilon" appears,
+	// then verify ordering across the accumulated output.
+	var accumulated strings.Builder
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		accumulated.Write(bts)
+		return strings.Contains(accumulated.String(), "Epsilon")
+	}, teatest.WithDuration(10*time.Second))
+
+	full := accumulated.String()
+	// Verify all tokens appeared and in the correct relative order.
+	prev := 0
+	for _, tok := range []string{"Alpha", "Beta", "Gamma", "Delta", "Epsilon"} {
+		idx := strings.Index(full[prev:], tok)
+		if idx < 0 {
+			t.Fatalf("token %q not found after position %d in accumulated output", tok, prev)
+		}
+		prev = prev + idx + len(tok)
+	}
+
+	tm.Send(tea.KeyMsg{Type: tea.KeyCtrlC})
+	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
+}
+
+// TestIntegration_StreamingMidStreamError verifies that when the SSE server
+// returns malformed JSON mid-stream, the agent surfaces an error in the TUI.
+func TestIntegration_StreamingMidStreamError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+
+		fmt.Fprintf(w, "data: {\"choices\":[{\"delta\":{\"role\":\"assistant\"}}]}\n\n")
+		fmt.Fprintf(w, "data: {\"choices\":[{\"delta\":{\"content\":\"Partial\"}}]}\n\n")
+		// Send malformed JSON to trigger a parse error.
+		fmt.Fprintf(w, "data: {INVALID JSON}\n\n")
+	}))
+	t.Cleanup(srv.Close)
+
+	client := llm.NewClient("fake-key")
+	client.SetBaseURL(srv.URL)
+
+	perm := permission.NewChecker()
+	reg := tool.NewRegistry()
+	ag := agent.New(agent.Options{
+		Client:     client,
+		Registry:   reg,
+		Permission: perm,
+		Model:      "test-model",
+	})
+
+	app := New(Options{
+		Agent: ag,
+		Config: &config.Config{
+			Model: "test-model",
+		},
+		ProjectCtx: &projectctx.ProjectContext{
+			WorkingDir: "/home/user/myproject",
+			Memory:     "some memory",
+		},
+		Version: "v0.2.4-test",
+	})
+
+	tm := teatest.NewTestModel(t, app, teatest.WithInitialTermSize(120, 40))
+
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		return strings.Contains(string(bts), "Tool Activity")
+	}, teatest.WithDuration(3*time.Second))
+
+	tm.Send(SendMsg{Text: "test error"})
+
+	// The agent should finish with an error due to malformed SSE.
+	teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
+		s := string(bts)
+		return strings.Contains(s, "Error")
+	}, teatest.WithDuration(5*time.Second))
+
+	tm.Send(tea.KeyMsg{Type: tea.KeyCtrlC})
+	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
+}

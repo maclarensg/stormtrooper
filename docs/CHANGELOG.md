@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-02-11
+
+### Fixed
+- AI responses no longer appear with scrambled or out-of-order text during streaming.
+
 ## [0.2.4] - 2026-02-10
 
 ### Fixed
